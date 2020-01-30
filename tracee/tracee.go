@@ -299,7 +299,7 @@ func readStringFromBuff(buff io.Reader) (string, error) {
 	defer func() {
 		_, _ = readInt8FromBuff(buff) //discard last byte which is string terminator null
 	}()
-	err = binary.Read(buff, binary.LittleEndian, res)
+	err = binary.Read(buff, binary.LittleEndian, &res)
 	if err != nil {
 		return "", fmt.Errorf("error reading string arg: %v", err)
 	}
@@ -375,7 +375,7 @@ func readArgFromBuff(dataBuff io.Reader) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-	case StrArrT:
+	case StrArrT: // FIXME: Untested
 		var ss []string
 		// assuming there's at least one element in the array
 		et, err := readArgTypeFromBuff(dataBuff)
@@ -403,7 +403,7 @@ func readArgFromBuff(dataBuff io.Reader) (interface{}, error) {
 		if int(cap) < len(capabilities) {
 			res = capabilities[cap]
 		} else {
-			res = string(cap)
+			res = "CAP_UNKNOWN"
 		}
 	case SyscallT:
 		sc, err := readInt32FromBuff(dataBuff)
@@ -413,7 +413,7 @@ func readArgFromBuff(dataBuff io.Reader) (interface{}, error) {
 		if int(sc) < len(eventNames) {
 			res = eventNames[sc]
 		} else {
-			res = string(sc)
+			res = "syscall_unknown"
 		}
 	default:
 		//if we don't recognize the arg type, we can't parse the rest of the buffer
