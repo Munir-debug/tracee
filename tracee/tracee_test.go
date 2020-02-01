@@ -126,16 +126,26 @@ func Test_New(t *testing.T) {
 				OutputFormat:          "table",
 			},
 		},
+		{
+			name:             "sad path, no bpf code file specified",
+			inputTraceConfig: TraceConfig{},
+			expectedError:    errors.New("validation error: trace config validation failed: no bpf program file specified"),
+		},
 	}
 
 	for _, tc := range testCases {
 		tr, err := New(tc.inputTraceConfig)
-		require.Equal(t, tc.expectedError, err, tc.name)
-		assert.Equal(t, tc.expectedTraceConfig, tr.config, tc.name)
-		assert.NotNil(t, tr.bpfModule, tc.name)
-		assert.NotNil(t, tr.bpfPerfMap, tc.name)
-		assert.NotNil(t, tr.eventsChannel, tc.name)
-		assert.NotNil(t, tr.printer, tc.name)
-		tr.Close()
+		switch {
+		case tc.expectedError != nil:
+			require.Equal(t, tc.expectedError, err, tc.name)
+		default:
+			require.NoError(t, err, tc.name)
+			assert.Equal(t, tc.expectedTraceConfig, tr.config, tc.name)
+			assert.NotNil(t, tr.bpfModule, tc.name)
+			assert.NotNil(t, tr.bpfPerfMap, tc.name)
+			assert.NotNil(t, tr.eventsChannel, tc.name)
+			assert.NotNil(t, tr.printer, tc.name)
+			tr.Close()
+		}
 	}
 }
