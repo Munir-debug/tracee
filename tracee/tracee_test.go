@@ -82,27 +82,60 @@ func Test_readArgFromBuff(t *testing.T) {
 }
 
 func Test_New(t *testing.T) {
-	tc := TraceConfig{
-		BPFFile:               "./event_monitor_ebpf.c",
-		Syscalls:              map[string]bool{},
-		Sysevents:             map[string]bool{},
-		ContainerMode:         false,
-		DetectOriginalSyscall: false,
-		OutputFormat:          "json",
+	testCases := []struct {
+		name                string
+		inputTraceConfig    TraceConfig
+		expectedTraceConfig TraceConfig
+		expectedError       error
+	}{
+		{
+			name: "happy path, with no extra syscalls or sysevents",
+			inputTraceConfig: TraceConfig{
+				BPFFile:               "./event_monitor_ebpf.c",
+				Syscalls:              map[string]bool{},
+				Sysevents:             map[string]bool{},
+				ContainerMode:         false,
+				DetectOriginalSyscall: false,
+				OutputFormat:          "json",
+			},
+			expectedTraceConfig: TraceConfig{
+				BPFFile:               "./event_monitor_ebpf.c",
+				Syscalls:              map[string]bool{"execve": true, "execveat": true},
+				Sysevents:             map[string]bool{"do_exit": true},
+				ContainerMode:         false,
+				DetectOriginalSyscall: false,
+				OutputFormat:          "json",
+			},
+		},
+		{
+			name: "happy path, with extra syscalls and sysevents",
+			inputTraceConfig: TraceConfig{
+				BPFFile:               "./event_monitor_ebpf.c",
+				Syscalls:              map[string]bool{"mmap": true, "fork": true},
+				Sysevents:             map[string]bool{"cap_capable": true},
+				ContainerMode:         false,
+				DetectOriginalSyscall: false,
+				OutputFormat:          "table",
+			},
+			expectedTraceConfig: TraceConfig{
+				BPFFile:               "./event_monitor_ebpf.c",
+				Syscalls:              map[string]bool{"execve": true, "execveat": true, "mmap": true, "fork": true},
+				Sysevents:             map[string]bool{"do_exit": true, "cap_capable": true},
+				ContainerMode:         false,
+				DetectOriginalSyscall: false,
+				OutputFormat:          "table",
+			},
+		},
 	}
-	tr, err := New(tc)
-	require.NoError(t, err)
-	assert.Equal(t, TraceConfig{
-		BPFFile:               "./event_monitor_ebpf.c",
-		Syscalls:              map[string]bool{"execve": true, "execveat": true},
-		Sysevents:             map[string]bool{"do_exit": true},
-		ContainerMode:         false,
-		DetectOriginalSyscall: false,
-		OutputFormat:          "json",
-	}, tr.config)
-	assert.NotNil(t, tr.bpfModule)
-	assert.NotNil(t, tr.bpfPerfMap)
-	assert.NotNil(t, tr.eventsChannel)
-	assert.NotNil(t, tr.printer)
 
+	for _, tc := range testCases {
+		tr, err := New(tc.inputTraceConfig)
+		require.Equal(t, tc.expectedError, err, tc.name)
+		assert.Equal(t, tc.expectedTraceConfig, tr.config, tc.name)
+		assert.NotNil(t, tr.bpfModule, tc.name)
+		assert.NotNil(t, tr.bpfPerfMap, tc.name)
+		assert.NotNil(t, tr.eventsChannel, tc.name)
+		assert.NotNil(t, tr.printer, tc.name)
+		tr.Close()
+	}
 }

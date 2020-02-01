@@ -64,10 +64,14 @@ type TraceConfig struct {
 }
 
 // Validate does static validation of the configuration
-// TODO: if error in golang is same as exception then this is abusing error
 func (tc TraceConfig) Validate() error {
 	if tc.BPFFile == "" {
 		return fmt.Errorf("trace config validation failed: no bpf program file specified")
+	}
+
+	_, err := os.Stat(tc.BPFFile)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("error finding bpf C file at: %s", tc.BPFFile)
 	}
 
 	if tc.Syscalls == nil || tc.Sysevents == nil {
@@ -132,17 +136,10 @@ type Tracee struct {
 
 // New creates a new Tracee instance based on a given valid TraceConfig
 func New(cfg TraceConfig) (*Tracee, error) {
-	var err error
-
 	// validation
-	err = cfg.Validate()
+	err := cfg.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("validation error: %v", err)
-	}
-
-	_, err = os.Stat(cfg.BPFFile)
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("error finding bpf C file at: %s", cfg.BPFFile)
 	}
 
 	// ensure essential syscalls and events are being traced
