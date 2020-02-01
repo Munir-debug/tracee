@@ -55,6 +55,7 @@ type context struct {
 // TraceConfig is a struct containing user defined configuration of tracee
 // TODO: TraceConfig or TraceeConfig?
 type TraceConfig struct {
+	BPFFile               string
 	Syscalls              map[string]bool
 	Sysevents             map[string]bool
 	ContainerMode         bool
@@ -65,6 +66,10 @@ type TraceConfig struct {
 // Validate does static validation of the configuration
 // TODO: if error in golang is same as exception then this is abusing error
 func (tc TraceConfig) Validate() error {
+	if tc.BPFFile == "" {
+		return fmt.Errorf("trace config validation failed: no bpf program file specified")
+	}
+
 	if tc.Syscalls == nil || tc.Sysevents == nil {
 		return fmt.Errorf("trace config validation failed: sysevents or syscalls is nil")
 	}
@@ -87,7 +92,7 @@ func (tc TraceConfig) Validate() error {
 }
 
 // NewConfig creates a new TraceConfig instance based on the given configuration
-func NewConfig(eventsToTrace []string, containerMode bool, detectOriginalSyscall bool, outputFormat string) (*TraceConfig, error) {
+func NewConfig(eventsToTrace []string, containerMode bool, detectOriginalSyscall bool, outputFormat string, bpfFile string) (*TraceConfig, error) {
 	//separate eventsToTrace into syscalls and sysevents
 	syscalls := make(map[string]bool)
 	sysevents := make(map[string]bool)
@@ -101,6 +106,7 @@ func NewConfig(eventsToTrace []string, containerMode bool, detectOriginalSyscall
 	}
 
 	tc := TraceConfig{
+		BPFFile:               bpfFile,
 		Syscalls:              syscalls,
 		Sysevents:             sysevents,
 		ContainerMode:         containerMode,
@@ -117,12 +123,11 @@ func NewConfig(eventsToTrace []string, containerMode bool, detectOriginalSyscall
 
 // Tracee traces system calls and events using eBPF
 type Tracee struct {
-	config         TraceConfig
-	bpfProgramPath string
-	bpfModule      *bpf.Module
-	bpfPerfMap     *bpf.PerfMap
-	eventsChannel  chan []byte
-	printer        eventPrinter
+	config        TraceConfig
+	bpfModule     *bpf.Module
+	bpfPerfMap    *bpf.PerfMap
+	eventsChannel chan []byte
+	printer       eventPrinter
 }
 
 // New creates a new Tracee instance based on a given valid TraceConfig
@@ -134,10 +139,10 @@ func New(cfg TraceConfig) (*Tracee, error) {
 	if err != nil {
 		return nil, fmt.Errorf("validation error: %v", err)
 	}
-	bpfFile := "./tracee/event_monitor_ebpf.c"
-	_, err = os.Stat(bpfFile)
+
+	_, err = os.Stat(cfg.BPFFile)
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("error finding bpf C file at: %s", bpfFile)
+		return nil, fmt.Errorf("error finding bpf C file at: %s", cfg.BPFFile)
 	}
 
 	// ensure essential syscalls and events are being traced
@@ -150,8 +155,7 @@ func New(cfg TraceConfig) (*Tracee, error) {
 
 	// create tracee
 	t := &Tracee{
-		config:         cfg,
-		bpfProgramPath: bpfFile,
+		config: cfg,
 	}
 	switch t.config.OutputFormat {
 	case "table":
@@ -194,7 +198,7 @@ func (t Tracee) Close() {
 func (t *Tracee) initBPF() error {
 	var err error
 
-	bpfText, err := ioutil.ReadFile(t.bpfProgramPath)
+	bpfText, err := ioutil.ReadFile(t.config.BPFFile)
 	if err != nil {
 		return fmt.Errorf("error reading ebpf program file: %v", err)
 	}

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,4 +79,30 @@ func Test_readArgFromBuff(t *testing.T) {
 		assert.Equal(t, tc.expectedError, err, tc.name)
 		assert.Equal(t, tc.expectedArg, actual, tc.name)
 	}
+}
+
+func Test_New(t *testing.T) {
+	tc := TraceConfig{
+		BPFFile:               "./event_monitor_ebpf.c",
+		Syscalls:              map[string]bool{},
+		Sysevents:             map[string]bool{},
+		ContainerMode:         false,
+		DetectOriginalSyscall: false,
+		OutputFormat:          "json",
+	}
+	tr, err := New(tc)
+	require.NoError(t, err)
+	assert.Equal(t, TraceConfig{
+		BPFFile:               "./event_monitor_ebpf.c",
+		Syscalls:              map[string]bool{"execve": true, "execveat": true},
+		Sysevents:             map[string]bool{"do_exit": true},
+		ContainerMode:         false,
+		DetectOriginalSyscall: false,
+		OutputFormat:          "json",
+	}, tr.config)
+	assert.NotNil(t, tr.bpfModule)
+	assert.NotNil(t, tr.bpfPerfMap)
+	assert.NotNil(t, tr.eventsChannel)
+	assert.NotNil(t, tr.printer)
+
 }

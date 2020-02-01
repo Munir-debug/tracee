@@ -19,12 +19,7 @@ func main() {
 				printList()
 				return nil
 			}
-			cfg, err := tracee.NewConfig(
-				c.StringSlice("events-to-trace"),
-				c.Bool("container"),
-				c.Bool("detect-original-syscall"),
-				c.String("output"),
-			)
+			cfg, err := tracee.NewConfig(c.StringSlice("events-to-trace"), c.Bool("container"), c.Bool("detect-original-syscall"), c.String("output"), c.String("bpfcode"))
 			if err != nil {
 				return fmt.Errorf("error creating Tracee config: %v", err)
 			}
@@ -64,6 +59,12 @@ func main() {
 				Name:  "detect-original-syscall",
 				Value: false,
 				Usage: "when tracing kernel functions which are not syscalls (such as cap_capable), detect and show the original syscall that called that function",
+			},
+			&cli.StringFlag{
+				Name:    "bpfcode",
+				Aliases: []string{"bpf"},
+				Value:   "./tracee/event_monitor_ebpf.c",
+				Usage:   "bpf code C file",
 			},
 		},
 	}
